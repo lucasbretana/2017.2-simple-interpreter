@@ -1,177 +1,277 @@
 import Estado
 --import InferenciaTipo
 
-data AExp = Num Int
-            |Var String
-            |Sum AExp AExp
-            |Sub AExp AExp
-            |Mul AExp AExp
-  deriving(Show)
-
-data BExp = TRUE
+data Exp = Num Int
+            | Var String
+            | Sum Exp Exp
+            | Sub Exp Exp
+            | Mul Exp Exp
+            | TRUE
             | FALSE
-            | Not BExp
-            | And BExp BExp
-            | Or  BExp BExp
-            | Ig  AExp AExp
-  deriving(Show)
-
-data CExp = While BExp CExp
-            | If BExp CExp CExp
-            | Seq CExp CExp
-            | Atrib AExp AExp
+            | Not Exp
+            | And Exp Exp
+            | Or  Exp Exp
+            | Ig  Exp Exp
             | Skip
             | Throw
-            | TryCatch CExp CExp
+            | TryCatch Exp Exp
+            | If Exp Exp Exp
+            | While Exp Exp
+            | Seq Exp Exp
+            | Atrib Exp Exp
   deriving(Show)
 
-data Exp = Exp1 AExp | Exp2 BExp | Exp3 CExp
-  deriving(Show)
+--dataExp =Exp1 Exp |Exp2 Exp |Exp3 Exp
+--  deriving(Show)
 
-data Type = VOID | INT | BOOL
-  deriving(Show)
+data Type = VOID | INT | BOOL | Error Exp Exp Type
 
+instance Show Type where
+  show VOID = "VOID"
+  show INT = "INT"
+  show BOOL = "BOOL"
+  --
+  show (Error exp arg rt) = 
+    "Expected type \'" ++ (show rt) ++ "\' for the \'" ++ (show arg) ++ "\'\nin the expression \'" ++ (show exp) ++ "\' that have format \'" ++ (ritgh exp) ++ "\'"
+  --show (Error e rt wt ) = "In expression \'" ++ (show e) ++ "\' expected \'" ++ (show rt) ++ "\' but had \'" ++ (show wt) ++ "\' in \n              \'" ++ (ritgh e) ++ "\' got \'" ++  ++ "\'"
+
+ritgh :: Exp -> String
+ritgh (Num _) = "Num"
+ritgh (Var _) = "Var"
+ritgh (Sum _ _) = "Sum INT INT"
+ritgh (Sub _ _) = "Sub INT INT"
+ritgh (Mul _ _) = "Mul INT INT"
+ritgh (Not _) = "Not BOOL"
+ritgh (And _ _) = "And BOOL BOOL"
+ritgh (Or _ _) = "Or BOOL BOOL"
+ritgh (Ig _ _) = "Ig BOOL BOOL"
+ritgh (TryCatch _ _) = "TryCatch VOID VOID"
+ritgh (If _ _ _) = "If BOOL VOID VOID"
+ritgh (While _ _) = "While BOOL VOID"
+ritgh (Seq _ _) = "Seq VOID VOID"
+ritgh (Atrib _ _) = "Atrib INT INT"
+ritgh a = show a
 --------------------------------------------------------------------
 -- Aritmetcs rules
-interpretA :: (AExp,Estado) -> (AExp,Estado)
-interpretA (a,s) = if isFinalA a then (a,s) else interpretA (aSmallStep (a,s))
+interpret :: (Exp,Estado) -> (Exp,Estado)
+interpret (a,s) = if isFinal a then (a,s) else interpret (smallStep (a,s))
 
-isFinalA :: AExp -> Bool
-isFinalA (Num a) = True
-isFinalA _       = False
+isFinal :: Exp -> Bool
+isFinal (Num a) = True
+isFinal TRUE   = True
+isFinal FALSE  = True
+isFinal Skip   = True
+isFinal Throw  = True
+isFinal _      = False
 
-aSmallStep :: (AExp,Estado) -> (AExp,Estado)
+smallStep :: (Exp,Estado) -> (Exp,Estado)
 -- Var
-aSmallStep (Var x,s) = (Num (procuraVar s x),s)
+smallStep (Var x,s) = (Num (procuraVar s x),s)
 -- Sum
-aSmallStep (Sum (Num x) (Num y), s) = (Num (x+y),s)
-aSmallStep (Sum (Num x) e2, s) = let (ef,_) = aSmallStep (e2 ,s)
-                                    in (Sum (Num x) ef,s)
-aSmallStep (Sum e1 e2, s) = let (ef,_) = aSmallStep (e1, s)
-                                    in (Sum ef e2,s)
+smallStep (Sum (Num x) (Num y), s) = (Num (x+y),s)
+smallStep (Sum (Num x) e2, s) = let (ef, sf) = smallStep (e2 ,s)
+                                    in (Sum (Num x) ef,sf)
+smallStep (Sum e1 e2, s) = let (ef,sf) = smallStep (e1, s)
+                                    in (Sum ef e2, sf)
 -- Subtraction
-aSmallStep (Sub (Num n1) (Num n2), s) = (Num (n1-n2), s)
-aSmallStep (Sub (Num n) e, s) = let (ef, _) = aSmallStep (e, s) 
-                                      in (Sub (Num n) ef, s)
-aSmallStep (Sub e1 e2, s) = let (ef, _) = aSmallStep (e1, s)
-                                      in (Sum ef e1, s)
+smallStep (Sub (Num n1) (Num n2), s) = (Num (n1-n2), s)
+smallStep (Sub (Num n) e, s) = let (ef, sf) = smallStep (e, s) 
+                                      in (Sub (Num n) ef, sf)
+smallStep (Sub e1 e2, s) = let (ef, sf) = smallStep (e1, s)
+                                      in (Sub ef e2, sf)
 -- Multiplication
-aSmallStep (Mul (Num n1) (Num n2), s) = (Num (n1*n2), s)
-aSmallStep (Mul (Num n) e, s) = let (ef, _)  = aSmallStep (e, s)
-                                      in (Sum (Num n) ef, s)
-aSmallStep (Mul e1 e2, s) = let (ef, _) = aSmallStep (e1, s)
-                                      in (Sum ef e2, s)
+smallStep (Mul (Num n1) (Num n2), s) = (Num (n1*n2), s)
+smallStep (Mul (Num n) e, s) = let (ef, sf)  = smallStep (e, s)
+                                      in (Sum (Num n) ef, sf)
+smallStep (Mul e1 e2, s) = let (ef, sf) = smallStep (e1, s)
+                                      in (Sum ef e2, sf)
 
 --------------------------------------------------------------------
 -- Boolean rules
 --------------------------------------------------------------------
-interpretB :: (BExp,Estado) -> (BExp,Estado)
-interpretB (b,s) = if isFinalB b then (b,s) else interpretB (bSmallStep (b,s))
-
-isFinalB :: BExp -> Bool
-isFinalB TRUE   = True
-isFinalB FALSE  = True
-isFinalB _      = False
-
-
-bSmallStep :: (BExp,Estado) -> (BExp,Estado)
 -- Not
-bSmallStep (Not FALSE,s)    = (TRUE, s)
-bSmallStep (Not TRUE,s)     = (FALSE, s)
-bSmallStep (Not b, s) = let (bn,sn) = bSmallStep (b,s)
+smallStep (Not FALSE,s)    = (TRUE, s)
+smallStep (Not TRUE,s)     = (FALSE, s)
+smallStep (Not b, s) = let (bn,sn) = smallStep (b,s)
                             in (Not bn ,sn)
 -- And
-bSmallStep (And TRUE b2,s)  = (b2,s)
-bSmallStep (And FALSE b2,s) = (FALSE,s)
-bSmallStep (And b1 b2,s) = let (bn,sn) = bSmallStep (b1,s)
+smallStep (And TRUE b2,s)  = (b2,s)
+smallStep (And FALSE b2,s) = (FALSE,s)
+smallStep (And b1 b2,s) = let (bn,sn) = smallStep (b1,s)
                             in (And bn b2,sn)
 -- Or
-bSmallStep (Or TRUE _, s)   = (TRUE, s)
-bSmallStep (Or FALSE b, s)  = (b, s)
-bSmallStep (Or b1 b2, s)  = let (bf, _) = bSmallStep (b1, s)
+smallStep (Or TRUE _, s)   = (TRUE, s)
+smallStep (Or FALSE b, s)  = (b, s)
+smallStep (Or b1 b2, s)  = let (bf, _) = smallStep (b1, s)
                           in (Or bf b2, s)
 -- Ig
-bSmallStep (Ig (Num n1) (Num n2), s)
+smallStep (Ig (Num n1) (Num n2), s)
   | n1 == n2  = (TRUE, s)
   | otherwise = (FALSE, s)
-bSmallStep (Ig (Num n) e, s) = let (ef, _) = aSmallStep (e, s)
+smallStep (Ig (Num n) e, s) = let (ef, _) = smallStep (e, s)
                                   in (Ig (Num n) ef, s)
-bSmallStep (Ig e1 e2, s) = let (ef, _) = aSmallStep (e1, s)
+smallStep (Ig e1 e2, s) = let (ef, _) = smallStep (e1, s)
                                   in (Ig ef e2, s)
 
 --------------------------------------------------------------------
 -- Command interpreter
 --------------------------------------------------------------------
-
-interpretC :: (CExp,Estado) -> (CExp,Estado)
-interpretC (c,s) = if isFinalC c then (c, s) else interpretC (cSmallStep (c, s))
-
-isFinalC :: CExp -> Bool
-isFinalC Skip   = True
-isFinalC Throw  = True
-isFinalC _      = False
-
-cSmallStep :: (CExp,Estado) -> (CExp,Estado)
 -- If
-cSmallStep (If TRUE c1 c2, s) = (c1, s)
-cSmallStep (If FALSE c1 c2, s) = (c2, s)
-cSmallStep (If b c1 c2, s) = (If bf c1 c2, s)
+smallStep (If TRUE c1 c2, s) = (c1, s)
+smallStep (If FALSE c1 c2, s) = (c2, s)
+smallStep (If b c1 c2, s) = (If bf c1 c2, s)
   where
-    (bf, _) = bSmallStep (b, s)
+    (bf, _) = smallStep (b, s)
 -- Seq
-cSmallStep (Seq Skip c, s) = (c, s)
-cSmallStep (Seq Throw _, s) = (Throw, s)
-cSmallStep (Seq c1 c2, s) = (Seq cf c2, sf)
+smallStep (Seq Skip c, s) = (c, s)
+smallStep (Seq Throw _, s) = (Throw, s)
+smallStep (Seq c1 c2, s) = (Seq cf c2, sf)
   where
-    (cf, sf) = cSmallStep (c1, s)
+    (cf, sf) = smallStep (c1, s)
 -- While
-cSmallStep (While b c, s) = (If b (Seq c (While b c)) Skip, s)
+smallStep (While b c, s) = (If b (Seq c (While b c)) Skip, s)
 -- Atrib
-cSmallStep (Atrib (Var name) (Num n), s) = (Skip, mudaVar s name n)
-cSmallStep (Atrib (Var n1) (Var n2), s) = (Atrib (Var n1) (Num (procuraVar s n2)), s)
+smallStep (Atrib (Var name) (Num n), s) = (Skip, mudaVar s name n)
+smallStep (Atrib (Var name) e, s) = let (ef, sf) = smallStep (e, s)
+                                    in (Atrib (Var name) ef, sf)
+smallStep (Atrib v e, s) = let (vf, sf) = smallStep (vf, sf)
+                          in (Atrib vf e, sf)
 -- TryCatch
-cSmallStep (TryCatch Skip _, s) = (Skip, s)
-cSmallStep (TryCatch Throw (c), s) = (c, s)
-cSmallStep (TryCatch c1 c2, s) = (TryCatch cf c2, sf)
+smallStep (TryCatch Skip _, s) = (Skip, s)
+smallStep (TryCatch Throw (c), s) = (c, s)
+smallStep (TryCatch c1 c2, s) = (TryCatch cf c2, sf)
   where
-    (cf, sf) = cSmallStep (c1, s)
+    (cf, sf) = smallStep (c1, s)
 
 
 --------------------------------------------------------------------
 -- Type inference
 --------------------------------------------------------------------
 iTipo :: Exp -> Type
-iTipo (Exp3 Skip) = VOID
-iTipo (Exp3 (If b c1 c2)) = case (iTipo b) of
+iTipo (Num _) = INT
+iTipo (Var _) = INT
+iTipo (Sum a b) = case (iTipo a) of
+                    INT -> case (iTipo b) of
+                            INT -> INT
+                            otherwise -> Error (Sum a b) b INT
+                    otherwise -> Error (Sum a b) a INT
+iTipo (Sub a b) = case (iTipo a) of
+                    INT -> case (iTipo b) of
+                            INT -> INT
+                            otherwise -> Error (Sub a b) b INT
+                    otherwise -> Error (Sub a b) a INT
+iTipo (Mul a b) = case (iTipo a) of
+                    INT -> case (iTipo b) of
+                            INT -> INT
+                            otherwise -> Error (Mul a b) b INT
+                    otherwise -> Error (Mul a b) a INT
+iTipo TRUE = BOOL
+iTipo FALSE = BOOL
+iTipo (Not a) = case (iTipo a) of
+              BOOL -> BOOL
+              otherwise -> Error (Not a) a BOOL
+iTipo (And a b) = case (iTipo a) of
+                    BOOL -> case (iTipo b) of
+                            BOOL -> BOOL
+                            otherwise -> Error (And a b) b BOOL
+                    otherwise -> Error (And a b) a BOOL
+iTipo (Or a b) = case (iTipo a) of
+                    BOOL -> case (iTipo b) of
+                            BOOL -> BOOL
+                            otherwise -> Error (Or a b) b BOOL
+                    otherwise -> Error (Or a b) a BOOL
+iTipo (Ig a b) = case (iTipo a) of
+                    INT -> case (iTipo b) of
+                            INT -> BOOL
+                            otherwise -> Error (Ig a b) b INT
+                    otherwise -> Error (Ig a b) a INT
+iTipo Skip = VOID
+iTipo Throw = VOID
+iTipo (TryCatch c1 c2) = case (iTipo c1) of
+                          VOID -> case (iTipo c2) of 
+                                  VOID -> VOID
+                                  otherwise -> Error (TryCatch c1 c2) c2 VOID
+                          otherwise -> Error (TryCatch c1 c2) c1 VOID
+iTipo (If b c1 c2) = case (iTipo b) of
                      BOOL -> case (iTipo c1) of
                                 VOID -> case (iTipo c2) of
                                           VOID -> VOID
-                                          otherwise -> error "Third argument must be VOID"
-                                otherwise -> error "Second argument must be VOID"
-                     otherwise -> error "First argument must be BOOL"
+                                          otherwise -> Error (If b c1 c2) c2 VOID
+                                otherwise -> Error (If b c1 c2) c1 VOID
+                     otherwise -> Error (If b c1 c2) b BOOL
+iTipo (While b c) = case (iTipo b) of
+                    BOOL -> case (iTipo c) of 
+                            VOID -> VOID
+                            otherwise -> Error c (While b c) VOID
+                    otherwise -> Error (While b c) b BOOL
+iTipo (Seq c1 c2) = case (iTipo c1) of
+                    VOID -> case (iTipo c2) of
+                            VOID -> VOID
+                            otherwise -> Error (Seq c1 c2) c2 VOID
+                    otherwise -> Error (Seq c1 c2) c1 VOID
+iTipo (Atrib v e) = case (iTipo v) of
+                    INT -> case (iTipo e) of
+                           INT -> VOID
+                           otherwise -> Error (Atrib v e) e INT
+                    otherwise -> Error (Atrib v e) v INT
 
 --------------------------------------------------------------------
 -- Other stuff
 --------------------------------------------------------------------
 cleanMem :: Estado
-cleanMem = [("x",0), ("y",0), ("z",313)]
+cleanMem = [("x",0), ("y",0), ("z",313), ("w", 0)]
 
-bExe1 :: BExp
-bExe1 = And (And TRUE (Not FALSE)) (Or (Not (Ig (Var "x") (Var "y"))) TRUE)
+anotherMem :: Estado
+anotherMem = [("x", 1), ("y", 2), ("z", 3), ("w", 0)]
 
-cExce1 :: CExp
-cExce1 = Seq (Atrib (Var "x") (Num 5)) (TryCatch Skip (Atrib (Var "x") (Var "z")))
+fullMem :: Estado
+fullMem = [("x", 1), ("y", 1), ("z", 313), ("w", 400)]
 
-cExce2 :: CExp
-cExce2 = Seq Throw cExce1
-
---------------------------------------------------------------------
---------------------------------------------------------------------
 meuEstado :: Estado
-meuEstado = [("x",3), ("y",0), ("z",0)]
+meuEstado = [("x",3), ("y",0), ("z",0), ("w", 0)]
 
-exemplo :: AExp
+inc :: Exp -> Exp
+inc (Var a) = Atrib (Var a) (Sum (Var a) (Num 1))
+
+dec :: Exp -> Exp
+dec (Var a) = Atrib (Var a) (Sub (Var a) (Num 1))
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+
+exemplo :: Exp
 exemplo = Sum (Num 3) (Sum (Var "x") (Var "y"))
 
-exemplo2 :: BExp
+exemplo2 :: Exp
 exemplo2 = And (And TRUE (Not FALSE)) (And (Not (Not TRUE)) TRUE)
+
+bExe1 :: Exp
+bExe1 = And (And TRUE (Not FALSE)) (Or (Not (Ig (Var "x") (Var "y"))) TRUE)
+
+cExce2 :: Exp
+cExce2 = Seq Throw bExe1
+
+cExce3 :: Exp
+cExce3 = Seq Throw (Var "x")
+
+--------------------------------------------------------------------
+--------------------------------------------------------------------
+-- Exemplos de exceções
+--
+-- Com TryCatch
+exemploExcecao1 :: Exp
+exemploExcecao1 = Seq (Atrib (Var "x") (Num 5)) (TryCatch Throw (Atrib (Var "x") (Var "z")))
+
+exemploExcecao2 :: Exp
+exemploExcecao2 = While (Ig (Var "x") (Var "y")) (TryCatch (Seq (Atrib (Var "x") (Sum (Var "x") (Num 1))) Throw) (Atrib (Var "x") (Num 313)))
+
+-- TODO: a big problem
+
+-- Apenas com Throw
+exemploExcecao3 :: Exp
+exemploExcecao3 = While (And (Ig (Var "x") (Var "y")) (Not (Ig (Var "z") (Var "w")))) (Seq (Seq (inc (Var "x")) (inc (Var "y"))) (If (Ig (Var "x") (Var "z")) Throw (dec (Var "w"))))
+
+-- TODO: One more
+
+--------------------------------------------------------------------
+-- TODO: exemples of wrong type format
