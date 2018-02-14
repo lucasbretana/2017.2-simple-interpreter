@@ -25,8 +25,12 @@ data CExp = While BExp CExp
             | TryCatch CExp CExp
   deriving(Show)
 
+data Exp = Exp1 AExp | Exp2 BExp | Exp3 CExp
+  deriving(Show)
+
 data Type = VOID | INT | BOOL
   deriving(Show)
+
 --------------------------------------------------------------------
 -- Aritmetcs rules
 interpretA :: (AExp,Estado) -> (AExp,Estado)
@@ -132,6 +136,19 @@ cSmallStep (TryCatch c1 c2, s) = (TryCatch cf c2, sf)
   where
     (cf, sf) = cSmallStep (c1, s)
 
+
+--------------------------------------------------------------------
+-- Type inference
+--------------------------------------------------------------------
+iTipo :: Exp -> Type
+iTipo (Exp3 Skip) = VOID
+iTipo (Exp3 (If b c1 c2)) = case (iTipo b) of
+                     BOOL -> case (iTipo c1) of
+                                VOID -> case (iTipo c2) of
+                                          VOID -> VOID
+                                          otherwise -> error "Third argument must be VOID"
+                                otherwise -> error "Second argument must be VOID"
+                     otherwise -> error "First argument must be BOOL"
 
 --------------------------------------------------------------------
 -- Other stuff
