@@ -30,10 +30,12 @@ instance Show Type where
   show VOID = "VOID"
   show INT = "INT"
   show BOOL = "BOOL"
-  --
-  show (Error exp arg rt) = 
-    "Expected type \'" ++ (show rt) ++ "\' for the \'" ++ (show arg) ++ "\'\nin the expression \'" ++ (show exp) ++ "\' that have format \'" ++ (ritgh exp) ++ "\'"
-  --show (Error e rt wt ) = "In expression \'" ++ (show e) ++ "\' expected \'" ++ (show rt) ++ "\' but had \'" ++ (show wt) ++ "\' in \n              \'" ++ (ritgh e) ++ "\' got \'" ++  ++ "\'"
+  show (Error exp arg rt) = "Type error \n" ++
+    "Argument \'" ++ (show arg) ++ "\' had type \'" ++ (show $iTipo arg) ++ "\'\n" ++
+    "In expression \'" ++ (show exp) ++ "\'\n" ++
+    "Excpected type \'" ++ (show rt) ++ "\'\n" ++
+    "In expression \'" ++ (ritgh exp) ++ "\'"
+    --"Expected type \'" ++ (show rt) ++ "\' for the \'" ++ (show arg) ++ "\'\nin the expression \'" ++ (show exp) ++ "\' that have format \'" ++ (ritgh exp) ++ "\'"
 
 ritgh :: Exp -> String
 ritgh (Num _) = "Num"
@@ -151,66 +153,90 @@ iTipo :: Exp -> Type
 iTipo (Num _) = INT
 iTipo (Var _) = INT
 iTipo (Sum a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     INT -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             INT -> INT
                             otherwise -> Error (Sum a b) b INT
                     otherwise -> Error (Sum a b) a INT
 iTipo (Sub a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     INT -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             INT -> INT
                             otherwise -> Error (Sub a b) b INT
                     otherwise -> Error (Sub a b) a INT
 iTipo (Mul a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     INT -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             INT -> INT
                             otherwise -> Error (Mul a b) b INT
                     otherwise -> Error (Mul a b) a INT
 iTipo TRUE = BOOL
 iTipo FALSE = BOOL
 iTipo (Not a) = case (iTipo a) of
+              Error a b c -> Error a b c
               BOOL -> BOOL
               otherwise -> Error (Not a) a BOOL
 iTipo (And a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     BOOL -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             BOOL -> BOOL
                             otherwise -> Error (And a b) b BOOL
                     otherwise -> Error (And a b) a BOOL
 iTipo (Or a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     BOOL -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             BOOL -> BOOL
                             otherwise -> Error (Or a b) b BOOL
                     otherwise -> Error (Or a b) a BOOL
 iTipo (Ig a b) = case (iTipo a) of
+                    Error a b c -> Error a b c
                     INT -> case (iTipo b) of
+                            Error a b c -> Error a b c
                             INT -> BOOL
                             otherwise -> Error (Ig a b) b INT
                     otherwise -> Error (Ig a b) a INT
 iTipo Skip = VOID
 iTipo Throw = VOID
 iTipo (TryCatch c1 c2) = case (iTipo c1) of
+                          Error a b c -> Error a b c
                           VOID -> case (iTipo c2) of 
+                                  Error a b c -> Error a b c
                                   VOID -> VOID
                                   otherwise -> Error (TryCatch c1 c2) c2 VOID
                           otherwise -> Error (TryCatch c1 c2) c1 VOID
 iTipo (If b c1 c2) = case (iTipo b) of
-                     BOOL -> case (iTipo c1) of
-                                VOID -> case (iTipo c2) of
-                                          VOID -> VOID
-                                          otherwise -> Error (If b c1 c2) c2 VOID
-                                otherwise -> Error (If b c1 c2) c1 VOID
-                     otherwise -> Error (If b c1 c2) b BOOL
+                      Error a b c -> Error a b c
+                      BOOL -> case (iTipo c1) of
+                              Error a b c -> Error a b c
+                              VOID -> case (iTipo c2) of
+                                      Error a b c -> Error a b c
+                                      VOID -> VOID
+                                      otherwise -> Error (If b c1 c2) c2 VOID
+                              otherwise -> Error (If b c1 c2) c1 VOID
+                      otherwise -> Error (If b c1 c2) b BOOL
 iTipo (While b c) = case (iTipo b) of
+                    Error a b c -> Error a b c
                     BOOL -> case (iTipo c) of 
+                            Error a b c -> Error a b c
                             VOID -> VOID
-                            otherwise -> Error c (While b c) VOID
+                            otherwise -> Error (While b c) c VOID
                     otherwise -> Error (While b c) b BOOL
 iTipo (Seq c1 c2) = case (iTipo c1) of
+                    Error a b c -> Error a b c
                     VOID -> case (iTipo c2) of
+                            Error a b c -> Error a b c
                             VOID -> VOID
                             otherwise -> Error (Seq c1 c2) c2 VOID
                     otherwise -> Error (Seq c1 c2) c1 VOID
 iTipo (Atrib v e) = case (iTipo v) of
+                    Error a b c -> Error a b c
                     INT -> case (iTipo e) of
+                           Error a b c -> Error a b c
                            INT -> VOID
                            otherwise -> Error (Atrib v e) e INT
                     otherwise -> Error (Atrib v e) v INT
@@ -265,13 +291,17 @@ exemploExcecao1 = Seq (Atrib (Var "x") (Num 5)) (TryCatch Throw (Atrib (Var "x")
 exemploExcecao2 :: Exp
 exemploExcecao2 = While (Ig (Var "x") (Var "y")) (TryCatch (Seq (Atrib (Var "x") (Sum (Var "x") (Num 1))) Throw) (Atrib (Var "x") (Num 313)))
 
--- TODO: a big problem
-
 -- Apenas com Throw
 exemploExcecao3 :: Exp
-exemploExcecao3 = While (And (Ig (Var "x") (Var "y")) (Not (Ig (Var "z") (Var "w")))) (Seq (Seq (inc (Var "x")) (inc (Var "y"))) (If (Ig (Var "x") (Var "z")) Throw (dec (Var "w"))))
-
--- TODO: One more
+exemploExcecao3 = While (And (Ig (Var "x") (Sum (Var "y") (Num 2))) (Not (Ig (Var "z") (Var "w")))) (Seq (Seq (inc (Var "x")) (inc (Var "y"))) (If (Ig (Var "x") (Var "z")) Throw (dec (Var "w"))))
 
 --------------------------------------------------------------------
--- TODO: exemples of wrong type format
+-- Exemplos de inferência de tipo que dão erro
+exemploInferencia1 :: Exp
+exemploInferencia1 = While (And (Ig (Var "x") (Var "y")) (Not (Ig (Var "z") (Var "w")))) (Seq (Seq (Var "x") (Var "y")) (If (Ig (Var "x") (Var "z")) Throw (Var "w")))
+
+exemploInferencia2 :: Exp
+exemploInferencia2 = And (Var "x") (Or TRUE (Ig (Var "x") (Var "y")))
+
+exemploInferencia3 :: Exp
+exemploInferencia3 = TryCatch Throw (Seq (Num 1) exemploExcecao1)
